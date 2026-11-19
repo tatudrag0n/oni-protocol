@@ -1,0 +1,90 @@
+
+/* ---------------- game data ---------------- */
+var DEFS={
+ imp:{hp:30,sp:4.1,r:.6,hr:.3,hy:.5,hov:1.1,dmg:12,reach:2,cd:1,sc:100,col:'pink'},
+ wisp:{hp:42,sp:3,r:.5,hr:.28,hy:.45,hov:1.6,dmg:10,reach:2,cd:1,sc:150,col:'cyan'},
+ phantom:{hp:26,sp:6,r:.55,hr:.28,hy:.45,hov:1.2,dmg:10,reach:1.9,cd:.85,sc:175,col:'violet'},
+ brute:{hp:170,sp:1.75,r:1.1,hr:.45,hy:1.15,hov:1.5,dmg:13,reach:2,cd:1,sc:400,col:'amber'},
+ boss:{hp:1300,sp:3,r:2.1,hr:.8,hy:2.1,hov:2.4,dmg:14,reach:3,cd:1,sc:5000,col:'red'}};
+var ICON={dmg:'M5 19L19 5M12 5h7v7',rate:'M13 2L5 13h6l-1 9 8-11h-6z',mag:'M7 3h10v14l-5 4-5-4zM7 8h10',
+ reload:'M20 12a8 8 0 1 1-3-6.3M20 3v5h-5',hp:'M12 21C5 14 3 9 6 6c2-2 5-1 6 1 1-2 4-3 6-1 3 3 1 8-6 15z',
+ speed:'M3 12h11M8 6h11M5 18h11M17 9l4 3-4 3',dash:'M4 12h9M13 5l7 7-7 7M4 6v12',
+ leech:'M12 3c3 4 6 7 6 11a6 6 0 1 1-12 0c0-4 3-7 6-11z',focus:'M12 4v4M12 16v4M4 12h4M16 12h4M12 10a2 2 0 1 0 .01 0',
+ pierce:'M3 12h18M16 7l5 5-5 5M8 5v14M12 5v14',pellets:'M6 6h.01M12 4h.01M18 6h.01M5 12h.01M12 12h.01M19 12h.01M8 18h.01M16 18h.01',
+ crit:'M12 3l2.5 6H21l-5 4 2 7-6-4-6 4 2-7-5-4h6.5z',bloom:'M12 8a4 4 0 1 0 .01 0M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2',
+ od:'M12 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3z'};
+var UPS=[
+ {id:'dmg',r:0,jp:'斬撃強化',en:'SHARPEN',de:'与ダメージ +15%。弾の一発が、鬼の核を深く抉る。',ap:function(s){s.dmg*=1.15;}},
+ {id:'rate',r:0,jp:'早撃ち',en:'RAPID FIRE',de:'連射速度 +12%。桜吹雪が、さらに激しく。',ap:function(s){s.rate*=1.12;}},
+ {id:'mag',r:0,jp:'大装弾',en:'EXTENDED MAG',de:'全武器の装弾数 +8(散弾 +2)。',ap:function(s){s.mag+=8;}},
+ {id:'reload',r:0,jp:'高速装填',en:'QUICK LOAD',de:'装填時間 −18%。隙を、消せ。',ap:function(s){s.rel*=.82;}},
+ {id:'hp',r:0,jp:'鋼体',en:'VITALITY',de:'最大HP +25、即座に25回復。',ap:function(s){s.maxHp+=25;P.hp=Math.min(s.maxHp,P.hp+25);}},
+ {id:'speed',r:0,jp:'疾風',en:'SWIFT',de:'移動速度 +8%。戦場を風のように駆けろ。',ap:function(s){s.sp*=1.08;}},
+ {id:'focus',r:0,jp:'収束',en:'FOCUS',de:'弾の拡散 −25%。狙いは常に急所へ。',ap:function(s){s.spr*=.75;}},
+ {id:'dash',r:1,jp:'神速縮地',en:'BLINK',de:'ダッシュ再使用 −20%。無敵の刻みが増える。',ap:function(s){s.dcd*=.8;}},
+ {id:'leech',r:1,jp:'吸血牙',en:'LEECH',de:'鬼を祓うたび HP +4。戦うほどに癒える。',ap:function(s){s.leech+=4;}},
+ {id:'pellets',r:1,jp:'散弾増量',en:'SPLIT SHOT',de:'雷鳴のペレット +2。一撃の嵐が厚くなる。',ap:function(s){s.pel+=2;}},
+ {id:'crit',r:1,jp:'急所狙い',en:'DEADEYE',de:'クリティカル倍率 +0.4。頭を狙え。',ap:function(s){s.crit+=.4;}},
+ {id:'bloom',r:1,jp:'桜の加護',en:'BLOOM',de:'自然回復 +2/s、回復待機 −1s。',ap:function(s){s.reg+=2;s.regD=Math.max(2,s.regD-1);}},
+ {id:'pierce',r:2,jp:'貫通弾',en:'PIERCE',de:'弾が鬼を1体貫通する。列ごと祓え。',ap:function(s){s.pierce+=1;}},
+ {id:'od',r:2,jp:'桜花繚乱',en:'OVERBLOOM',de:'繚乱時間 +4s、そして今すぐ発動。弾は無限、連射は倍。',ap:function(s){s.odD+=4;R.od=Math.min(20,s.odD);P.white=.3;}}];
+var RARJ=['標準 // COMMON','稀少 // RARE','伝説 // LEGEND'],RARC=['','rare','legend'];
+function baseStats(){return {dmg:1,rate:1,mag:0,rel:1,maxHp:100,sp:1,dcd:1,leech:0,spr:1,pierce:0,pel:0,crit:1.6,reg:3,regD:6,odD:8};}
+function baseRun(){return {score:0,kills:0,shots:0,hits:0,time:0,chain:0,ct:0,mult:1,maxC:1,wave:0,ws:'idle',wt:0,st:0,od:0,dying:0};}
+var P=null,ST=baseStats(),R=baseRun(),WPN=null,wi=0,swT=0,swSwap=false,swTo=0;
+var enemies=[],boss=null,bLag=100,queue=[],orbs=[],parts=[],picks=[],tracers=[],dnodes=[],rings=[];
+var firing=false,ads=false,adsK=0,dry=false,kick=0,swayX=0,swayY=0;
+var keys={},joy={x:0,y:0,id:-1,ox:0,oy:0},look={id:-1,x:0,y:0};
+var T=0,last=0,hitstop=0,state='TITLE',endless=false,recToast=false,newRec=false,pulse=0;
+var locked=false,pending=null,noLock=!TOUCH&&!cv.requestPointerLock;
+var curUps=[],picked=false,fpsE=16,slow=0,autoQ=false,errCount=0,radarCtx=null,rdpr=1,ready=false;
+
+function initPools(){
+  var i;orbs=[];for(i=0;i<120;i++)orbs.push({on:false,x:0,y:0,z:0,vx:0,vy:0,vz:0,life:0,dmg:10,col:'cyan',tt:0,sc:1});
+  parts=[];for(i=0;i<320;i++)parts.push({life:0,x:0,y:-999,z:0,vx:0,vy:0,vz:0,col:'#fff',size:.1,dec:1,g:0});
+  picks=[];for(i=0;i<12;i++)picks.push({on:false,kind:'hp',x:0,y:1,z:0,life:0,ph:rnd(0,TAU)});
+  tracers=[];for(i=0;i<40;i++)tracers.push({life:0,ax:0,ay:0,az:0,bx:0,by:0,bz:0,col:'#fff',w:2});
+  rings=[];for(i=0;i<10;i++)rings.push({life:0,max:.5,x:0,z:0,r:4,col:'#ff4d8d'});
+  dnodes=[];for(i=0;i<26;i++){var el=document.createElement('div');el.className='dn';el.style.display='none';
+    E.dlayer.appendChild(el);dnodes.push({el:el,x:0,y:0,z:0,life:0,rise:0});}
+}
+var PCOL={hp:'#3ef2a0',shield:'#2ee6ff',od:'#ffb648'},PGLOW={hp:'jade',shield:'cyan',od:'amber'};
+function burst(x,y,z,col,n,spd,ttl,size,grav,up){
+  for(var k=0;k<n;k++){var p=null;
+    for(var i=0;i<parts.length;i++)if(parts[i].life<=0){p=parts[i];break;}
+    if(!p)return;
+    p.x=x+rnd(-.15,.15);p.y=y+rnd(-.15,.15);p.z=z+rnd(-.15,.15);
+    var a=Math.random()*TAU,e=rnd(-1,1),s=spd*rnd(.35,1),q=Math.sqrt(Math.max(0,1-e*e));
+    p.vx=Math.cos(a)*q*s;p.vy=e*s+(up||0);p.vz=Math.sin(a)*q*s;
+    p.col=col;p.size=size*rnd(.6,1.4);p.life=1;p.dec=1/(ttl*rnd(.7,1.3));p.g=grav;}
+}
+function tracer(ax,ay,az,bx,by,bz,col,w){
+  for(var i=0;i<tracers.length;i++){var t=tracers[i];if(t.life>0)continue;
+    t.ax=ax;t.ay=ay;t.az=az;t.bx=bx;t.by=by;t.bz=bz;t.col=col;t.w=w;t.life=.07;return;}
+}
+function ringFx(x,z,r,col,dur){for(var i=0;i<rings.length;i++){var q=rings[i];if(q.life>0)continue;
+  q.x=x;q.z=z;q.r=r;q.col=col;q.life=q.max=dur||.5;return;}}
+function dnum(x,y,z,text,cls){
+  var d=null,i;for(i=0;i<dnodes.length;i++)if(dnodes[i].life<=0){d=dnodes[i];break;}
+  if(!d)d=dnodes[0];
+  d.x=x+rnd(-.2,.2);d.y=y+rnd(0,.2);d.z=z;d.life=.75;d.rise=rnd(30,50);
+  d.el.textContent=text;d.el.className='dn'+(cls?' '+cls:'');d.el.style.display='block';
+}
+function toast(t,c){var L=E.tlayer;while(L.children.length>=5)L.removeChild(L.firstChild);
+  var e=document.createElement('div');e.className='toast'+(c?' '+c:'');e.textContent=t;
+  e.addEventListener('animationend',function(){if(e.parentNode)e.parentNode.removeChild(e);});L.appendChild(e);}
+function banner(t,s,w){E.btitle.textContent=t;E.bsub.textContent=s;
+  E.banner.className=w?'warn':'';void E.banner.offsetWidth;E.banner.className=(w?'warn ':'')+'show';}
+
+/* ---------------- weapons ---------------- */
+function buildWeapons(){
+  WPN=[
+   {id:0,jp:'桜吹雪',en:'SAKURA BLIZZARD',iv:.111,dmg:12,mag:30,rl:1.15,spr:.012,bl:.0045,blMax:.04,pel:1,kick:.0038,shk:.05,adsF:56,adsS:.35,col:'#ffd9e8',glow:'pink2',ammo:30,bloom:0,cd:0,rt:0,rd:1,mid:false,flash:0},
+   {id:1,jp:'雷鳴',en:'RAIMEI',iv:.8,dmg:9,mag:6,rl:1.55,spr:.085,bl:0,blMax:0,pel:8,kick:.02,shk:.18,adsF:62,adsS:.6,col:'#ffc857',glow:'amber',ammo:6,bloom:0,cd:0,rt:0,rd:1,mid:false,flash:0}];
+}
+var wp=function(){return WPN[wi];};
+var magOf=function(w){return w.mag+(w.id===1?Math.ceil(ST.mag/4):ST.mag);};
+function setW(i){if(i===wi||swT>0)return;swT=.26;swSwap=false;swTo=i;A.swap();}
+function reload(){var w=wp();if(w.rt>0||swT>0||w.ammo>=magOf(w)||R.od>0)return;
+  w.rd=w.rl*ST.rel;w.rt=w.rd;w.mid=false;A.rl0();}
+function chips(){E.chip1.className='chip'+(wi===0?' on':'');E.chip2.className='chip'+(wi===1?' on':'');}
