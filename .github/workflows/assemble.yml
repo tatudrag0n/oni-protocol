@@ -2,8 +2,7 @@ name: assemble
 on:
   push:
     branches: [main]
-    paths:
-      - '_parts/**'
+  workflow_dispatch:
 permissions:
   contents: write
 jobs:
@@ -14,11 +13,15 @@ jobs:
       - name: Assemble index.html
         run: |
           set -euo pipefail
-          cat _parts/*.html > index.html
-          rm -rf _parts
-          rm -f .github/workflows/assemble.yml
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "build: assemble index.html from parts"
-          git push
+          if [ -d _parts ]; then
+            cat _parts/*.html > index.html
+            rm -rf _parts
+            rm -f .github/workflows/assemble.yml
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "build: assemble index.html from parts"
+            git push
+          else
+            echo "no _parts directory; nothing to do"
+          fi
